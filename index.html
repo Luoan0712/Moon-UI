@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Moon UI</title>
+    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+    <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.quilljs.com/1.3.6/quill.snow.css">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --win-bg: #1a1a2e;
+            --win-accent: #0078d4;
+            --win-accent-hover: #106ebe;
+            --win-card-bg: rgba(255, 255, 255, 0.08);
+            --win-border: rgba(255, 255, 255, 0.1);
+            --win-text: #ffffff;
+            --win-text-secondary: rgba(255, 255, 255, 0.7);
+            --win-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            --win-taskbar: rgba(20, 20, 30, 0.85);
+        }
+        body { font-family: 'Segoe UI', 'HarmonyOS Sans', system-ui, sans-serif; overflow: hidden; height: 100vh; width: 100vw; background: #0a0a1a; }
+        .wallpaper-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; transition: background-image 0.5s ease; z-index: 0; }
+        .desktop { position: relative; width: 100%; height: 100%; z-index: 1; background: rgba(0, 0, 0, 0.15); }
+        .desktop-icons { position: absolute; top: 30px; left: 24px; display: grid; grid-template-columns: repeat(2, 100px); gap: 20px; z-index: 10; }
+        .desktop-icon { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 8px; border-radius: 12px; cursor: pointer; transition: all 0.2s; color: white; width: 100px; }
+        .desktop-icon:hover { background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); }
+        .desktop-icon .icon { font-size: 32px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.3); border-radius: 12px; }
+        .desktop-icon .label { font-size: 11px; text-align: center; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        .taskbar { position: fixed; bottom: 0; left: 0; right: 0; height: 48px; background: var(--win-taskbar); backdrop-filter: blur(24px); display: flex; align-items: center; justify-content: center; z-index: 1000; border-top: 1px solid var(--win-border); }
+        .taskbar-center { display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.05); padding: 4px 12px; border-radius: 32px; }
+        .start-btn { width: 40px; height: 40px; background: transparent; border: none; border-radius: 20px; cursor: pointer; font-size: 20px; transition: 0.1s; color: white; }
+        .start-btn:hover { background: rgba(255, 255, 255, 0.15); }
+        .taskbar-apps { display: flex; gap: 4px; }
+        .taskbar-app { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 20px; cursor: pointer; transition: 0.1s; font-size: 18px; }
+        .taskbar-app:hover { background: rgba(255, 255, 255, 0.15); }
+        .taskbar-app.active { background: rgba(255, 255, 255, 0.2); position: relative; }
+        .taskbar-app.active::after { content: ''; position: absolute; bottom: -6px; left: 12px; right: 12px; height: 2px; background: var(--win-accent); border-radius: 2px; }
+        .clock-area { position: absolute; right: 16px; display: flex; gap: 8px; font-size: 12px; color: white; }
+        .start-menu { position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%); width: 500px; background: rgba(20, 20, 30, 0.92); backdrop-filter: blur(32px); border-radius: 20px; border: 1px solid var(--win-border); box-shadow: var(--win-shadow); z-index: 1100; display: none; overflow: hidden; }
+        .start-menu.show { display: block; animation: fadeInUp 0.2s ease; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+        .start-header { padding: 20px 24px 12px; border-bottom: 1px solid var(--win-border); }
+        .start-user { display: flex; align-items: center; gap: 12px; }
+        .start-avatar { width: 48px; height: 48px; background: var(--win-accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .start-user-info h4 { font-size: 16px; margin-bottom: 4px; }
+        .start-user-info p { font-size: 12px; opacity: 0.6; }
+        .start-pins { padding: 12px 20px; }
+        .start-pins-title { font-size: 12px; opacity: 0.6; margin-bottom: 12px; text-transform: uppercase; }
+        .start-pins-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .start-pin { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px; border-radius: 12px; cursor: pointer; transition: 0.1s; }
+        .start-pin:hover { background: rgba(255, 255, 255, 0.1); }
+        .start-pin .pin-icon { font-size: 24px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.08); border-radius: 12px; }
+        .start-pin .pin-name { font-size: 11px; }
+        .start-recommended { padding: 12px 20px 20px; border-top: 1px solid var(--win-border); }
+        .window { position: absolute; background: rgba(30, 30, 40, 0.96); backdrop-filter: blur(20px); border-radius: 16px; border: 1px solid var(--win-border); box-shadow: var(--win-shadow); display: flex; flex-direction: column; overflow: hidden; min-width: 550px; min-height: 450px; z-index: 100; resize: both; }
+        .window.active { z-index: 300; border-color: var(--win-accent); }
+        .window-header { background: rgba(0, 0, 0, 0.3); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: move; font-size: 13px; font-weight: 500; color: white; border-bottom: 1px solid var(--win-border); }
+        .window-title { display: flex; align-items: center; gap: 8px; }
+        .window-controls { display: flex; gap: 8px; }
+        .window-controls span { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; transition: 0.1s; }
+        .window-controls span:hover { background: rgba(255, 255, 255, 0.15); }
+        .window-controls .close:hover { background: #e81123; }
+        .window-content { flex: 1; overflow: auto; padding: 16px; color: #ddd; }
+        .file-manager { display: flex; flex-direction: column; height: 100%; }
+        .file-toolbar { padding: 10px; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--win-border); display: flex; gap: 10px; flex-wrap: wrap; }
+        .file-toolbar button { padding: 6px 14px; background: var(--win-accent); color: white; border: none; border-radius: 6px; cursor: pointer; }
+        .file-address { padding: 8px 12px; background: rgba(0,0,0,0.2); font-family: monospace; font-size: 12px; border-bottom: 1px solid var(--win-border); }
+        .file-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .file-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; cursor: pointer; border-radius: 8px; }
+        .file-item:hover { background: rgba(255, 255, 255, 0.08); }
+        .file-icon { font-size: 24px; width: 36px; text-align: center; }
+        .file-name { flex: 1; }
+        .file-item.selected { background: var(--win-accent); color: white; }
+        .this-pc { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; padding: 24px; }
+        .drive-item { background: rgba(255,255,255,0.08); border-radius: 20px; padding: 20px; text-align: center; cursor: pointer; border: 1px solid var(--win-border); }
+        .drive-item:hover { background: rgba(255,255,255,0.15); transform: translateY(-2px); }
+        .drive-icon { font-size: 48px; }
+        .tomato-timer { text-align: center; padding: 20px; }
+        .timer-display { font-size: 64px; font-family: monospace; font-weight: bold; margin: 20px 0; }
+        .timer-controls button { padding: 10px 20px; margin: 0 8px; background: var(--win-accent); border: none; border-radius: 8px; color: white; cursor: pointer; }
+        .recycle-item { display: flex; align-items: center; gap: 12px; padding: 10px; border-bottom: 1px solid var(--win-border); }
+        .recycle-restore { margin-left: auto; background: var(--win-accent); border: none; padding: 4px 12px; border-radius: 6px; color: white; cursor: pointer; }
+        .notification-area { position: fixed; bottom: 60px; right: 20px; z-index: 1200; }
+        .notify { background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(12px); padding: 10px 18px; border-radius: 32px; font-size: 13px; margin-top: 8px; color: white; }
+        .copyright { position: fixed; bottom: 8px; left: 16px; font-size: 10px; color: rgba(255, 255, 255, 0.4); z-index: 999; }
+        .context-menu { position: fixed; background: rgba(30, 30, 40, 0.95); backdrop-filter: blur(20px); border-radius: 12px; border: 1px solid var(--win-border); padding: 6px 0; min-width: 180px; z-index: 2000; }
+        .context-menu-item { padding: 8px 16px; cursor: pointer; transition: 0.05s; }
+        .context-menu-item:hover { background: rgba(255, 255, 255, 0.1); }
+        .mount-overlay, .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+        .mount-card, .login-card { background: rgba(30,35,48,0.95); border-radius: 24px; padding: 32px; width: 400px; text-align: center; border: 1px solid rgba(255,255,255,0.2); }
+        .mount-card button, .login-card button { background: var(--win-accent); border: none; padding: 12px 24px; border-radius: 32px; color: white; cursor: pointer; font-size: 16px; margin-top: 20px; }
+        .login-card input { width: 100%; padding: 12px; margin: 12px 0; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: white; outline: none; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="wallpaper-layer" id="wallpaperLayer"></div>
+<div class="desktop" id="desktopArea">
+    <div class="desktop-icons">
+        <div class="desktop-icon" data-app="browser"><div class="label">浏览器</div></div>
+        <div class="desktop-icon" data-app="omnipotent"><div class="label">全能中心</div></div>
+        <div class="desktop-icon" data-app="settings"><div class="label">设置</div></div>
+    </div>
+</div>
+
+<div class="taskbar">
+    <div class="taskbar-center">
+        <button class="start-btn" id="startBtn">O</button>
+        <div class="taskbar-apps" id="taskbarApps">
+            <div class="taskbar-app" data-app="browser"></div>
+            <div class="taskbar-app" data-app="omnipotent"></div>
+            <div class="taskbar-app" data-app="settings"></div>
+        </div>
+    </div>
+    <div class="clock-area">
+        <span id="clockDisplay">--:--</span>
+    </div>
+</div>
+
+<div id="startMenu" class="start-menu">
+    <div class="start-header">
+        <div class="start-user">
+            <div class="start-avatar" id="startAvatar">👤</div>
+            <div class="start-user-info">
+                <h4 id="startUsername">用户</h4>
+                <p id="startUserStatus">已登录</p>
+            </div>
+        </div>
+    </div>
+    <div class="start-pins">
+        <div class="start-pins-title"> 固定 </div>
+        <div class="start-pins-grid">
+            <div class="start-pin" data-app="browser"><div class="pin-icon">🌐</div><div class="pin-name">浏览器</div></div>
+            <div class="start-pin" data-app="omnipotent"><div class="pin-icon">⭐</div><div class="pin-name">全能中心</div></div>
+         </div>
+    </div>
+    <div class="start-recommended">
+        <div class="start-pins-title">system 系统</div>
+        <div class="start-pins-grid">
+            <div class="start-pin" data-app="settings"><div class="pin-icon">⚙️</div><div class="pin-name">设置</div></div>
+            <div class="start-pin" id="lockBtn"><div class="pin-icon">🔒</div><div class="pin-name">锁定</div></div>
+            <div class="start-pin" id="shutdownBtn"><div class="pin-icon">🔌</div><div class="pin-name">关闭所有</div></div>
+        </div>
+    </div>
+</div>
+
+<div class="notification-area" id="notifyArea"></div>
+<div class="copyright">copyright (c) Bealcom.</div>
+
+<script>
+    // ==================== U盘 核心存储 ====================
+    let usbRoot = null, webosDir = null;
+    let userConfig = { name: '用户', password: '' };
+    let isLoggedIn = true;
+    let fileSystemData = { root: { type: 'folder', children: ['Documents', 'Pictures', 'Downloads', '回收站'] },
+        Documents: { type: 'folder', parent: 'root', children: [] },
+        Pictures: { type: 'folder', parent: 'root', children: [] },
+        Downloads: { type: 'folder', parent: 'root', children: [] },
+        '回收站': { type: 'folder', parent: 'root', children: [] } };
+    let currentPath = 'root';
+    let selectedFile = null;
+    let currentFileManagerWin = null;
+    let recycleBin = [];
+    let windows = [], activeWindowId = null, nextZIndex = 300;
+    let tomatoInterval = null, tomatoSeconds = 25 * 60, tomatoRunning = false, tomatoSessions = 0;
+    let quillEditor = null;
+    let peer = null;
+
+    function showNotification(msg, duration = 2500) {
+        const area = document.getElementById('notifyArea');
+        const notif = document.createElement('div');
+        notif.className = 'notify';
+        notif.innerText = msg;
+        area.appendChild(notif);
+        setTimeout(() => notif.remove(), duration);
+    }
+
+    async function ensureWebOSDir() { try { webosDir = await usbRoot.getDirectoryHandle('.webos', { create: true }); return true; } catch(e) { return false; } }
+    async function saveConfig() { if(!webosDir) return; const f = await webosDir.getFileHandle('config.json', { create: true }); const w = await f.createWritable(); await w.write(JSON.stringify(userConfig, null, 2)); await w.close(); }
+    async function loadConfig() { if(!webosDir) return null; try { const f = await webosDir.getFileHandle('config.json'); const file = await f.getFile(); return JSON.parse(await file.text()); } catch(e) { return null; } }
+    async function saveFileSystem() { if(!webosDir) return; const f = await webosDir.getFileHandle('filesystem.json', { create: true }); const w = await f.createWritable(); await w.write(JSON.stringify(fileSystemData, null, 2)); await w.close(); }
+    async function loadFileSystem() { if(!webosDir) return null; try { const f = await webosDir.getFileHandle('filesystem.json'); const file = await f.getFile(); fileSystemData = JSON.parse(await file.text()); return fileSystemData; } catch(e) { return null; } }
+    async function saveWallpaper(blob) { if(!webosDir) return; try { const f = await webosDir.getFileHandle('wallpaper.jpg', { create: true }); const w = await f.createWritable(); await w.write(blob); await w.close(); const url = URL.createObjectURL(blob); document.getElementById('wallpaperLayer').style.backgroundImage = `url(${url})`; showNotification('壁纸已保存'); } catch(e) {} }
+    async function loadWallpaper() { if(!webosDir) return; try { const f = await webosDir.getFileHandle('wallpaper.jpg'); const file = await f.getFile(); document.getElementById('wallpaperLayer').style.backgroundImage = `url(${URL.createObjectURL(file)})`; } catch(e) { document.getElementById('wallpaperLayer').style.backgroundImage = 'linear-gradient(135deg, #1a2a3a 0%, #0a1520 100%)'; } }
+
+    function closeWindow(winId) {
+        const idx = windows.findIndex(w => w.id === winId);
+        if (idx === -1) return;
+        windows[idx].element.remove();
+        windows.splice(idx, 1);
+        if (activeWindowId === winId) activeWindowId = windows.length ? windows[windows.length-1]?.id : null;
+        if (activeWindowId) setActiveWindow(activeWindowId);
+        renderTaskbarApps();
+        if (winId === currentFileManagerWin) currentFileManagerWin = null;
+    }
+    function setActiveWindow(winId) {
+        const win = windows.find(w => w.id === winId);
+        if (!win) return;
+        nextZIndex++;
+        win.element.style.zIndex = nextZIndex;
+        document.querySelectorAll('.window').forEach(w => w.classList.remove('active'));
+        win.element.classList.add('active');
+        activeWindowId = winId;
+        renderTaskbarApps();
+    }
+    function renderTaskbarApps() {
+        const container = document.getElementById('taskbarApps');
+        const apps = container.querySelectorAll('.taskbar-app');
+        apps.forEach(app => { const isOpen = windows.some(w => w.appType === app.getAttribute('data-app')); isOpen ? app.classList.add('active') : app.classList.remove('active'); });
+    }
+    function makeDraggable(header, winDiv, winId) {
+        let drag = false, offX, offY;
+        header.addEventListener('mousedown', (e) => {
+            if (e.target.classList?.contains('close-btn')) return;
+            drag = true; offX = e.clientX - winDiv.offsetLeft; offY = e.clientY - winDiv.offsetTop;
+            winDiv.style.cursor = 'grabbing'; setActiveWindow(winId); e.preventDefault();
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!drag) return;
+            let nx = e.clientX - offX, ny = e.clientY - offY;
+            nx = Math.min(Math.max(nx, -50), window.innerWidth - winDiv.offsetWidth + 50);
+            ny = Math.min(Math.max(ny, 0), window.innerHeight - winDiv.offsetHeight - 40);
+            winDiv.style.left = nx + 'px'; winDiv.style.top = ny + 'px';
+        });
+        window.addEventListener('mouseup', () => { drag = false; winDiv.style.cursor = ''; });
+    }
+
+    function getChildren(path) { const node = fileSystemData[path]; if (!node || node.type !== 'folder') return []; return node.children || []; }
+    function addChild(parent, name, isFolder, content = '') {
+        if (!fileSystemData[parent]) return false;
+        if (!fileSystemData[parent].children) fileSystemData[parent].children = [];
+        if (fileSystemData[parent].children.includes(name)) return false;
+        fileSystemData[parent].children.push(name);
+        fileSystemData[name] = { type: isFolder ? 'folder' : 'file', parent: parent, content: content };
+        saveFileSystem(); return true;
+    }
+    function deleteToRecycle(name) {
+        const node = fileSystemData[name];
+        if (!node) return false;
+        const parent = node.parent;
+        if (parent && fileSystemData[parent] && fileSystemData[parent].children) {
+            const idx = fileSystemData[parent].children.indexOf(name);
+            if (idx !== -1) fileSystemData[parent].children.splice(idx, 1);
+        }
+        recycleBin.push({ name: name, originalPath: parent, content: node.content, type: node.type, deletedAt: new Date().toLocaleString() });
+        delete fileSystemData[name];
+        saveFileSystem(); return true;
+    }
+    function restoreFromRecycle(itemName) {
+        const item = recycleBin.find(r => r.name === itemName);
+        if (!item) return;
+        if (addChild(item.originalPath, item.name, item.type === 'folder', item.content)) {
+            const idx = recycleBin.findIndex(r => r.name === itemName);
+            recycleBin.splice(idx, 1);
+            saveFileSystem();
+            showNotification(`已恢复: ${itemName}`);
+        }
+    }
+    
+        
+    function openFileManager() {
+        if (windows.some(w => w.appType === 'filemanager')) { setActiveWindow(windows.find(w => w.appType === 'filemanager').id); return; }
+        const winId = 'fm_' + Date.now(); currentFileManagerWin = winId;
+        const winDiv = document.createElement('div'); winDiv.id = winId; winDiv.className = 'window';
+        winDiv.style.width = '850px'; winDiv.style.height = '520px'; winDiv.style.left = '100px'; winDiv.style.top = '70px';
+        winDiv.innerHTML = `<div class="window-header"><div class="window-title">📁 文件管理器</div><div class="window-controls"><span class="close-btn">✕</span></div></div>
+            <div class="window-content"><div class="file-manager"><div class="file-toolbar"><button id="fmNewFolderBtn">📁 新建文件夹</button><button id="fmUploadBtn">📤 上传文件</button><button id="fmDeleteBtn">🗑️ 删除(回收站)</button><button id="fmRefreshBtn">⟳ 刷新</button></div>
+            <div class="file-address" id="fmAddress"></div><div class="file-list" id="fmFileList"></div></div></div>`;
+        document.getElementById('desktopArea').appendChild(winDiv);
+        windows.push({ id: winId, element: winDiv, title: '文件管理器', appType: 'filemanager' });
+        renderTaskbarApps(); setActiveWindow(winId);
+        winDiv.querySelector('.close-btn').onclick = () => { closeWindow(winId); currentFileManagerWin = null; };
+        makeDraggable(winDiv.querySelector('.window-header'), winDiv, winId);
+        winDiv.querySelector('#fmNewFolderBtn').onclick = () => { let name = prompt('文件夹名:'); if (name && addChild(currentPath, name, true)) { refreshFileManager(); showNotification(`已创建: ${name}`); } };
+        winDiv.querySelector('#fmUploadBtn').onclick = () => { let inp = document.createElement('input'); inp.type = 'file'; inp.onchange = e => { let f = e.target.files[0]; if (f) { let r = new FileReader(); r.onload = ev => { let fn = f.name; if (addChild(currentPath, fn, false)) { fileSystemData[fn].content = ev.target.result; refreshFileManager(); showNotification(`已上传: ${fn}`); } }; r.readAsText(f); } }; inp.click(); };
+        winDiv.querySelector('#fmDeleteBtn').onclick = () => { if (!selectedFile) { showNotification('请先选中文件'); return; } if (confirm(`将 "${selectedFile}" 移动到回收站？`)) { deleteToRecycle(selectedFile); selectedFile = null; refreshFileManager(); showNotification(`已移至回收站`); } };
+        winDiv.querySelector('#fmRefreshBtn').onclick = refreshFileManager;
+        refreshFileManager();
+    }
+
+    function openRecycleBin() {
+        if (windows.some(w => w.appType === 'recycle')) { setActiveWindow(windows.find(w => w.appType === 'recycle').id); return; }
+        const winId = 'recycle_' + Date.now(); const winDiv = document.createElement('div'); winDiv.className = 'window';
+        winDiv.style.width = '600px'; winDiv.style.height = '450px'; winDiv.style.left = '120px'; winDiv.style.top = '80px';
+        function refreshRecycle() {
+            const listDiv = winDiv.querySelector('#recycleList'); listDiv.innerHTML = '';
+            if (recycleBin.length === 0) { listDiv.innerHTML = '<div style="padding:40px;text-align:center;opacity:0.6">🗑️ 回收站为空</div>'; return; }
+            for (const item of recycleBin) {
+                const row = document.createElement('div'); row.className = 'recycle-item';
+                row.innerHTML = `<span>${item.type === 'folder' ? '📁' : '📄'}</span><span style="flex:1">${escapeHtml(item.name)}</span><span style="font-size:11px;color:#888">${item.deletedAt}</span><button class="recycle-restore" data-name="${escapeHtml(item.name)}">↩️ 恢复</button>`;
+                listDiv.appendChild(row);
+            }
+            winDiv.querySelectorAll('.recycle-restore').forEach(btn => { btn.onclick = () => restoreFromRecycle(btn.getAttribute('data-name')); });
+        }
+        winDiv.innerHTML = `<div class="window-header"><div class="window-title">🗑️ 回收站</div><div class="window-controls"><span class="close-btn">✕</span></div></div>
+            <div class="window-content"><div style="padding:12px;background:rgba(0,0,0,0.2);margin-bottom:12px;border-radius:8px"><button id="emptyRecycleBtn" style="background:#e81123;border:none;padding:6px 12px;border-radius:6px;color:white;cursor:pointer">🗑️ 清空回收站</button></div><div id="recycleList"></div></div>`;
+        document.getElementById('desktopArea').appendChild(winDiv);
+        windows.push({ id: winId, element: winDiv, title: '回收站', appType: 'recycle' });
+        renderTaskbarApps(); setActiveWindow(winId);
+        winDiv.querySelector('.close-btn').onclick = () => closeWindow(winId);
+        makeDraggable(winDiv.querySelector('.window-header'), winDiv, winId);
+        winDiv.querySelector('#emptyRecycleBtn').onclick = () => { if (confirm('确定清空回收站吗？')) { recycleBin = []; saveFileSystem(); refreshRecycle(); showNotification('回收站已清空'); } };
+        refreshRecycle();
+    }
+
+    
+
+    async function searchWeb(query) {
+        try { const p = `https://api.allorigins.win/get?url=${encodeURIComponent('https://www.so.com/s?q='+encodeURIComponent(query))}`;
+        const res = await fetch(p); const data = await res.json(); const parser = new DOMParser(); const doc = parser.parseFromString(data.contents, 'text/html');
+        const items = doc.querySelectorAll('.res-list, .result'); let results = [];
+        for(let i=0;i<Math.min(items.length,8);i++){ let titleEl = items[i].querySelector('h3 a'); if(titleEl) results.push({ title: titleEl.innerText.trim(), url: titleEl.href, snippet: items[i].innerText.slice(0,150) }); }
+        if(results.length===0) results.push({ title: `搜索“${query}”的更多结果`, url: `https://www.so.com/s?q=${encodeURIComponent(query)}`, snippet: '点击打开360搜索' });
+        return results; } catch(e) { return [{ title: `在360搜索中查看“${query}”`, url: `https://www.so.com/s?q=${encodeURIComponent(query)}`, snippet: '点击跳转搜索' }]; }
+    }
+    function openBrowser() {
+        if (windows.some(w => w.appType === 'browser')) { setActiveWindow(windows.find(w => w.appType === 'browser').id); return; }
+        const winId = 'browser_' + Date.now(); const winDiv = document.createElement('div'); winDiv.className = 'window';
+        winDiv.style.width = '1100px'; winDiv.style.height = '700px'; winDiv.style.left = '60px'; winDiv.style.top = '50px';
+        winDiv.innerHTML = `<div class="window-header"><div class="window-title">🌐 浏览器</div><div class="window-controls"><span class="close-btn">✕</span></div></div>
+            <div class="window-content" style="padding:0;display:flex;flex-direction:column"><div style="display:flex;gap:8px;padding:12px;background:rgba(0,0,0,0.2)"><input type="text" id="urlInput" placeholder="搜索或输入网址" value="https://www.so.com" style="flex:1;padding:8px;border-radius:20px;border:none;background:#2a2a3a;color:white"><button id="searchBtn" style="background:#0078d4;border:none;padding:6px 16px;border-radius:20px;color:white;cursor:pointer">搜索</button></div>
+            <iframe id="browserFrame" style="flex:1;border:none" src="https://www.so.com"></iframe></div>`;
+        document.getElementById('desktopArea').appendChild(winDiv);
+        windows.push({ id: winId, element: winDiv, title: '浏览器', appType: 'browser' });
+        renderTaskbarApps(); setActiveWindow(winId);
+        winDiv.querySelector('.close-btn').onclick = () => closeWindow(winId);
+        makeDraggable(winDiv.querySelector('.window-header'), winDiv, winId);
+        const frame = winDiv.querySelector('#browserFrame'), input = winDiv.querySelector('#urlInput');
+        winDiv.querySelector('#searchBtn').onclick = () => { let u = input.value.trim(); if(!u.startsWith('http')) u='https://'+u; frame.src=u; };
+    }
+
+    function openOmnipotentCenter() {
+        if (windows.some(w => w.appType === 'omnipotent')) { setActiveWindow(windows.find(w => w.appType === 'omnipotent').id); return; }
+        const winId = 'omnipotent_' + Date.now(); const winDiv = document.createElement('div'); winDiv.className = 'window';
+        winDiv.style.width = '1000px'; winDiv.style.height = '700px'; winDiv.style.left = '70px'; winDiv.style.top = '60px';
+        winDiv.innerHTML = `<div class="window-header"><div class="window-title">⭐ 全能中心 · 快捷导航</div><div class="window-controls"><span class="close-btn">✕</span></div></div>
+            <div class="window-content" style="padding:0"><iframe src="https://Luoan0712.github.io/-/" style="width:100%;height:100%;border:none"></iframe></div>`;
+        document.getElementById('desktopArea').appendChild(winDiv);
+        windows.push({ id: winId, element: winDiv, title: '全能中心', appType: 'omnipotent' });
+        renderTaskbarApps(); setActiveWindow(winId);
+        winDiv.querySelector('.close-btn').onclick = () => closeWindow(winId);
+        makeDraggable(winDiv.querySelector('.window-header'), winDiv, winId);
+    }
+
+
+    function openSettings() {
+        if (windows.some(w => w.appType === 'settings')) { setActiveWindow(windows.find(w => w.appType === 'settings').id); return; }
+        const winId = 'settings_' + Date.now(); const winDiv = document.createElement('div'); winDiv.className = 'window';
+        winDiv.style.width = '500px'; winDiv.style.height = '450px'; winDiv.style.left = '100px'; winDiv.style.top = '80px';
+        winDiv.innerHTML = `<div class="window-header"><div class="window-title">⚙️ 设置</div><div class="window-controls"><span class="close-btn">✕</span></div></div>
+            <div class="window-content" style="padding:20px"><div style="margin-bottom:24px"><h3>👤 用户账户</h3><label>用户名</label><input type="text" id="setName" value="${userConfig.name}" style="width:100%;padding:8px;margin:8px 0;background:#2a2a3a;border:1px solid #444;border-radius:8px;color:white">
+            <label>密码</label><input type="password" id="setPass" placeholder="新密码" style="width:100%;padding:8px;margin:8px 0;background:#2a2a3a;border:1px solid #444;border-radius:8px;color:white">
+            <button id="saveUserBtn" style="background:#0078d4;border:none;padding:8px 16px;border-radius:8px;color:white;cursor:pointer">保存用户信息</button></div>
+            <div><h3>🖼️ 壁纸</h3><input type="file" id="wallpaperInput" accept="image/*" style="margin:12px 0;color:white"><button id="uploadWallpaperBtn" style="background:#0078d4;border:none;padding:8px 16px;border-radius:8px;color:white;cursor:pointer">上传并保存到U盘</button></div></div>`;
+        document.getElementById('desktopArea').appendChild(winDiv);
+        windows.push({ id: winId, element: winDiv, title: '设置', appType: 'settings' });
+        renderTaskbarApps(); setActiveWindow(winId);
+        winDiv.querySelector('.close-btn').onclick = () => closeWindow(winId);
+        makeDraggable(winDiv.querySelector('.window-header'), winDiv, winId);
+        winDiv.querySelector('#saveUserBtn').onclick = async () => { let newName = winDiv.querySelector('#setName').value.trim(); let newPass = winDiv.querySelector('#setPass').value; if (newName) userConfig.name = newName; if (newPass) userConfig.password = newPass; await saveConfig(); document.getElementById('startUsername').innerText = userConfig.name; showNotification('用户信息已保存'); };
+        winDiv.querySelector('#uploadWallpaperBtn').onclick = () => { const f = winDiv.querySelector('#wallpaperInput').files[0]; if (f) saveWallpaper(f); else showNotification('请先选择图片'); };
+    }
+
+    
+    function launchApp(app) { switch(app) {
+        case 'thispc': openThisPC(); break; case 'filemanager': openFileManager(); break; case 'editor': openDocumentEditor(); break;
+        case 'tomato': openTomatoTimer(); break; case 'browser': openBrowser(); break; case 'omnipotent': openOmnipotentCenter(); break;
+        case 'recycle': openRecycleBin(); break; case 'transfer': openTransferPanel(); break; case 'settings': openSettings(); break;
+    } }
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+    function lockSystem() { isLoggedIn = false; showLoginDialog(); }
+    
+    document.querySelectorAll('.desktop-icon').forEach(el => { el.addEventListener('click', () => launchApp(el.getAttribute('data-app'))); });
+    document.querySelectorAll('.taskbar-app').forEach(el => { el.onclick = () => launchApp(el.getAttribute('data-app')); });
+    document.querySelectorAll('.start-pin').forEach(el => { el.onclick = () => { launchApp(el.getAttribute('data-app')); toggleStart(); }; });
+    document.getElementById('lockBtn').onclick = () => { lockSystem(); toggleStart(); };
+    document.getElementById('shutdownBtn').onclick = () => { [...windows].forEach(w => closeWindow(w.id)); showNotification('所有窗口已关闭'); toggleStart(); };
+    
+    let startVisible = false; const startMenu = document.getElementById('startMenu'); const startBtn = document.getElementById('startBtn');
+    function toggleStart() { startVisible = !startVisible; startVisible ? startMenu.classList.add('show') : startMenu.classList.remove('show'); }
+    startBtn.onclick = (e) => { e.stopPropagation(); toggleStart(); };
+    window.onclick = (e) => { if(startVisible && !startMenu.contains(e.target) && e.target !== startBtn) { startMenu.classList.remove('show'); startVisible = false; } };
+    
+    window.addEventListener('keydown', (e) => {
+        if (e.altKey && e.key === 'Alt') { e.preventDefault(); toggleStart(); }
+        else if (e.altKey && e.key === 'q') { e.preventDefault(); openDocumentEditor(); }
+        else if (e.altKey && e.key === 'd') { e.preventDefault(); if(currentFileManagerWin && selectedFile) deleteToRecycle(selectedFile); }
+        else if (e.altKey && e.key === 'c') { e.preventDefault(); openTransferPanel(); }
+        else if (e.altKey && e.key === 'n') { e.preventDefault(); lockSystem(); }
+    });
+    
+    document.getElementById('desktopArea').addEventListener('contextmenu', (e) => {
+        e.preventDefault(); const menu = document.createElement('div'); menu.className = 'context-menu';
+        menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px';
+        menu.innerHTML = `<div class="context-menu-item" data-action="refresh">🔄 刷新桌面</div><div class="context-menu-item" data-action="newfolder">📁 新建文件夹</div><div class="context-menu-item" data-action="recycle">🗑️ 打开回收站</div><div class="context-menu-item" data-action="settings">⚙️ 系统设置</div>`;
+        document.body.appendChild(menu); const remove = () => menu.remove();
+        menu.querySelectorAll('.context-menu-item').forEach(item => { item.onclick = () => { const action = item.getAttribute('data-action'); if(action === 'refresh') location.reload(); if(action === 'newfolder') { let name = prompt('文件夹名:'); if(name) addChild('root', name, true); } if(action === 'recycle') openRecycleBin(); if(action === 'settings') openSettings(); remove(); }; });
+        setTimeout(() => { if(menu) menu.remove(); }, 3000); window.addEventListener('click', () => menu.remove(), { once: true });
+    });
+    
+    function updateClock() { document.getElementById('clockDisplay').innerText = new Date().toLocaleTimeString('zh-CN', { hour12: false }); }
+    setInterval(updateClock, 1000); updateClock();
+    
+    async function showMountDialog() {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div'); overlay.className = 'mount-overlay';
+            overlay.innerHTML = `<div class="mount-card"><div style="font-size:48px;margin-bottom:16px">💾</div><h3 style="color:white">选择 U盘 目录</h3><p style="margin:16px 0;opacity:0.7;color:white">所有系统数据将保存在您选择的U盘中</p><button id="selectUsbBtn" style="background:#0078d4;border:none;padding:12px 24px;border-radius:32px;color:white;cursor:pointer">📀 选择文件夹</button></div>`;
+            document.body.appendChild(overlay);
+            overlay.querySelector('#selectUsbBtn').onclick = async () => {
+                try { usbRoot = await window.showDirectoryPicker(); await ensureWebOSDir(); const savedConfig = await loadConfig(); if (savedConfig) userConfig = savedConfig; else await saveConfig(); await loadFileSystem(); if (!fileSystemData || Object.keys(fileSystemData).length === 0) { fileSystemData = { root: { type: 'folder', children: ['Documents', 'Pictures', 'Downloads', '回收站'] }, Documents: { type: 'folder', parent: 'root', children: [] }, Pictures: { type: 'folder', parent: 'root', children: [] }, Downloads: { type: 'folder', parent: 'root', children: [] }, '回收站': { type: 'folder', parent: 'root', children: [] } }; await saveFileSystem(); } await loadWallpaper(); overlay.remove(); resolve(true); } catch(e) { showNotification('请选择有效的文件夹'); } };
+            });
+    }
+    async function showLoginDialog() {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div'); overlay.className = 'login-overlay';
+            overlay.innerHTML = `<div class="login-card"><div style="font-size:48px;margin-bottom:16px">👤</div><h3 style="color:white">${userConfig.name}</h3><input type="password" id="loginPass" placeholder="密码" style="width:100%;padding:12px;margin:12px 0;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.2);border-radius:12px;color:white;outline:none" autofocus><button id="doLogin" style="width:100%;padding:12px;background:#0078d4;border:none;border-radius:12px;color:white;cursor:pointer">登录系统</button><p style="margin-top:16px;font-size:12px;opacity:0.6;color:white">${userConfig.password ? '需要密码' : '无需密码，直接登录'}</p></div>`;
+            document.body.appendChild(overlay);
+            const inp = overlay.querySelector('#loginPass'), btn = overlay.querySelector('#doLogin');
+            const check = () => { if (!userConfig.password || inp.value === userConfig.password) { overlay.remove(); isLoggedIn = true; document.getElementById('startUsername').innerText = userConfig.name; resolve(true); } else { showNotification('密码错误'); inp.value = ''; } };
+            btn.onclick = check; inp.onkeypress = e => { if (e.key === 'Enter') check(); };
+        });
+    }
+    
+</script>
+</body>
+</html>
